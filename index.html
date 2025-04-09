@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INEX Todo</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            background-color: #111827;
+            color: #f3f4f6;
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+        .inex-blue {
+            color: #3B82F6;
+        }
+        .inex-gradient {
+            background: linear-gradient(90deg, #111827, #1F2937);
+        }
+        .inex-card {
+            background-color: #1F2937;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .inex-button {
+            background-color: #3B82F6;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        .inex-button:hover {
+            background-color: #2563EB;
+        }
+        .inex-button-secondary {
+            background-color: #4B5563;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        .inex-button-secondary:hover {
+            background-color: #374151;
+        }
+        .inex-input {
+            background-color: #374151;
+            border: 1px solid #4B5563;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            width: 100%;
+        }
+        .inex-input:focus {
+            outline: none;
+            border-color: #3B82F6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+        }
+        .todo-item {
+            background-color: #1F2937;
+            border-left: 4px solid #3B82F6;
+            margin-bottom: 0.5rem;
+            border-radius: 0.375rem;
+            transition: all 0.3s ease;
+        }
+        .todo-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .completed {
+            text-decoration: line-through;
+            opacity: 0.7;
+            border-left-color: #10B981;
+        }
+        .logo-icon {
+            font-size: 1.5rem;
+        }
+        .indicator {
+            height: 8px;
+            width: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .indicator-online {
+            background-color: #10B981;
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .loading {
+            border: 3px solid rgba(59, 130, 246, 0.3);
+            border-radius: 50%;
+            border-top: 3px solid #3B82F6;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="flex justify-between items-center mb-8">
+            <div class="flex items-center">
+                <div class="mr-3 flex items-center justify-center h-10 w-10 rounded-full bg-blue-500">
+                    <i class="fas fa-check-double text-white logo-icon"></i>
+                </div>
+                <h1 class="text-2xl font-bold">
+                    INEX <span class="inex-blue">Todo</span>
+                </h1>
+            </div>
+            <div id="user-info" class="hidden items-center">
+                <span id="user-email" class="mr-4 text-gray-400"></span>
+                <button id="logout-button" class="inex-button-secondary">
+                    <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                </button>
+            </div>
+        </header>
+
+        <!-- Authentication Section -->
+        <div id="auth-section" class="max-w-md mx-auto fade-in">
+            <div class="inex-card p-6 mb-8">
+                <div class="tabs flex border-b border-gray-700 mb-6">
+                    <button id="login-tab" class="px-4 py-2 text-blue-400 border-b-2 border-blue-500 font-medium">Login</button>
+                    <button id="signup-tab" class="px-4 py-2 text-gray-400 font-medium">Sign Up</button>
+                </div>
+                
+                <!-- Login Form -->
+                <form id="login-form" class="space-y-4">
+                    <div>
+                        <label for="login-email" class="block text-sm font-medium text-gray-400 mb-1">Email</label>
+                        <input type="email" id="login-email" class="inex-input" placeholder="your@email.com" required>
+                    </div>
+                    <div>
+                        <label for="login-password" class="block text-sm font-medium text-gray-400 mb-1">Password</label>
+                        <input type="password" id="login-password" class="inex-input" placeholder="••••••••" required>
+                    </div>
+                    <div>
+                        <button type="submit" class="inex-button w-full flex justify-center items-center">
+                            <span>Login</span>
+                            <span id="login-loading" class="ml-2 loading hidden"></span>
+                        </button>
+                    </div>
+                    <div id="login-error" class="text-red-500 text-sm hidden"></div>
+                </form>
+                
+                <!-- Signup Form -->
+                <form id="signup-form" class="space-y-4 hidden">
+                    <div>
+                        <label for="signup-email" class="block text-sm font-medium text-gray-400 mb-1">Email</label>
+                        <input type="email" id="signup-email" class="inex-input" placeholder="your@email.com" required>
+                    </div>
+                    <div>
+                        <label for="signup-password" class="block text-sm font-medium text-gray-400 mb-1">Password</label>
+                        <input type="password" id="signup-password" class="inex-input" placeholder="••••••••" required>
+                    </div>
+                    <div>
+                        <label for="signup-password-confirm" class="block text-sm font-medium text-gray-400 mb-1">Confirm Password</label>
+                        <input type="password" id="signup-password-confirm" class="inex-input" placeholder="••••••••" required>
+                    </div>
+                    <div>
+                        <button type="submit" class="inex-button w-full flex justify-center items-center">
+                            <span>Sign Up</span>
+                            <span id="signup-loading" class="ml-2 loading hidden"></span>
+                        </button>
+                    </div>
+                    <div id="signup-error" class="text-red-500 text-sm hidden"></div>
+                </form>
+            </div>
+            
+            <div class="text-center mt-4">
+                <p class="text-gray-500 text-sm">INTERNATIONAL TECHNOLOGY FOR EVERYTHING</p>
+            </div>
+        </div>
+
+        <!-- Todo App Section -->
+        <div id="todo-app" class="hidden fade-in">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Stats Cards -->
+                <div class="inex-card p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-medium">Tasks</h3>
+                        <div class="indicator indicator-online"></div>
+                    </div>
+                    <p id="task-count" class="text-3xl font-bold inex-blue">0</p>
+                </div>
+                
+                <div class="inex-card p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-medium">Completed</h3>
+                        <div class="indicator indicator-online"></div>
+                    </div>
+                    <p id="completed-count" class="text-3xl font-bold inex-blue">0</p>
+                </div>
+            </div>
+            
+            <!-- Add Todo Form -->
+            <div class="inex-card p-6 mt-8">
+                <h2 class="text-xl font-bold mb-4">Add New Task</h2>
+                <form id="add-todo-form" class="flex flex-col md:flex-row gap-4">
+                    <input type="text" id="todo-title" class="inex-input md:flex-grow" placeholder="Task title" required>
+                    <input type="text" id="todo-description" class="inex-input md:flex-grow-2" placeholder="Task description">
+                    <button type="submit" class="inex-button whitespace-nowrap">
+                        <i class="fas fa-plus mr-2"></i>Add Task
+                    </button>
+                </form>
+            </div>
+            
+            <!-- Todo List -->
+            <div class="inex-card p-6 mt-8">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold">Your Tasks</h2>
+                    <div>
+                        <select id="todo-filter" class="inex-input py-1 px-3">
+                            <option value="all">All Tasks</option>
+                            <option value="active">Active</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div id="todo-list" class="space-y-3">
+                    <!-- Todo items will be generated here -->
+                    <div id="todo-empty" class="text-center py-8 text-gray-500">
+                        <i class="fas fa-clipboard-list text-4xl mb-3"></i>
+                        <p>Your task list is empty.</p>
+                        <p class="text-sm">Add a new task to get started.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Supabase Client properly before using it
+        const supabaseUrl = 'https://crwplwcyxcuczbzzumln.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNyd3Bsd2N5eGN1Y3pienp1bWxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMzNjYyOTIsImV4cCI6MjA1ODk0MjI5Mn0.L0bWva2oQBd_i10-Qn0t8leYmpzGMu5_UqI9f41CR2Q';
+        
+        // Create the supabase client
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        // DOM Elements
+        const authSection = document.getElementById('auth-section');
+        const todoApp = document.getElementById('todo-app');
+        const userInfo = document.getElementById('user-info');
+        const userEmail = document.getElementById('user-email');
+        const loginTab = document.getElementById('login-tab');
+        const signupTab = document.getElementById('signup-tab');
+        const loginForm = document.getElementById('login-form');
+        const signupForm = document.getElementById('signup-form');
+        const logoutButton = document.getElementById('logout-button');
+        const todoForm = document.getElementById('add-todo-form');
+        const todoList = document.getElementById('todo-list');
+        const todoEmpty = document.getElementById('todo-empty');
+        const todoFilter = document.getElementById('todo-filter');
+        const taskCount = document.getElementById('task-count');
+        const completedCount = document.getElementById('completed-count');
+        const loginLoading = document.getElementById('login-loading');
+        const signupLoading = document.getElementById('signup-loading');
+        const loginError = document.getElementById('login-error');
+        const signupError = document.getElementById('signup-error');
+
+        // State
+        let currentUser = null;
+        let todos = [];
+
+        // Check if user is already logged in
+        async function checkUser() {
+            try {
+                const { data, error } = await supabase.auth.getUser();
+                
+                if (error) {
+                    console.error('Error checking user session:', error);
+                    return;
+                }
+                
+                if (data && data.user) {
+                    currentUser = data.user;
+                    showTodoApp();
+                    fetchTodos();
+                }
+            } catch (error) {
+                console.error('Error during session check:', error);
+            }
+        }
+
+        // Authentication Tab Switch
+        loginTab.addEventListener('click', () => {
+            loginTab.classList.add('text-blue-400', 'border-b-2', 'border-blue-500');
+            loginTab.classList.remove('text-gray-400');
+            signupTab.classList.remove('text-blue-400', 'border-b-2', 'border-blue-500');
+            signupTab.classList.add('text-gray-400');
+            
+            loginForm.classList.remove('hidden');
+            signupForm.classList.add('hidden');
+        });
+
+        signupTab.addEventListener('click', () => {
+            signupTab.classList.add('text-blue-400', 'border-b-2', 'border-blue-500');
+            signupTab.classList.remove('text-gray-400');
+            loginTab.classList.remove('text-blue-400', 'border-b-2', 'border-blue-500');
+            loginTab.classList.add('text-gray-400');
+            
+            signupForm.classList.remove('hidden');
+            loginForm.classList.add('hidden');
+        });
+
+        // Login Form Submission
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            
+            loginError.classList.add('hidden');
+            loginLoading.classList.remove('hidden');
+            
+            try {
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email,
+                    password
+                });
+                
+                if (error) {
+                    throw error;
+                }
+                
+                if (data && data.user) {
+                    currentUser = data.user;
+                    showTodoApp();
+                    fetchTodos();
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                loginError.textContent = error.message || 'Failed to login. Please check your credentials.';
+                loginError.classList.remove('hidden');
+            } finally {
+                loginLoading.classList.add('hidden');
+            }
+        });
+
+        // Signup Form Submission
+        signupForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            const passwordConfirm = document.getElementById('signup-password-confirm').value;
+            
+            signupError.classList.add('hidden');
+            
+            if (password !== passwordConfirm) {
+                signupError.textContent = 'Passwords do not match';
+                signupError.classList.remove('hidden');
+                return;
+            }
+            
+            signupLoading.classList.remove('hidden');
+            
+            try {
+                const { data, error } = await supabase.auth.signUp({
+                    email,
+                    password
+                });
+                
+                if (error) {
+                    throw error;
+                }
+                
+                if (data.user) {
+                    currentUser = data.user;
+                    showTodoApp();
+                } else if (data.session === null) {
+                    // Email confirmation required
+                    signupError.textContent = 'Please check your email to confirm your account.';
+                    signupError.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Signup error:', error);
+                signupError.textContent = error.message || 'Failed to create account. Please try again.';
+                signupError.classList.remove('hidden');
+            } finally {
+                signupLoading.classList.add('hidden');
+            }
+        });
+
+        // Logout
+        logoutButton.addEventListener('click', async () => {
+            try {
+                const { error } = await supabase.auth.signOut();
+                
+                if (error) {
+                    throw error;
+                }
+                
+                currentUser = null;
+                todos = [];
+                showAuthSection();
+            } catch (error) {
+                console.error('Logout error:', error);
+                alert('Failed to logout. Please try again.');
+            }
+        });
+
+        // Show Todo App (after login/signup)
+        function showTodoApp() {
+            authSection.classList.add('hidden');
+            todoApp.classList.remove('hidden');
+            userInfo.classList.remove('hidden');
+            userInfo.classList.add('flex');
+            
+            if (currentUser && currentUser.email) {
+                userEmail.textContent = currentUser.email;
+            }
+        }
+
+        // Show Auth Section (after logout)
+        function showAuthSection() {
+            todoApp.classList.add('hidden');
+            authSection.classList.remove('hidden');
+            userInfo.classList.add('hidden');
+            userInfo.classList.remove('flex');
+            
+            // Reset forms
+            loginForm.reset();
+            signupForm.reset();
+            loginError.classList.add('hidden');
+            signupError.classList.add('hidden');
+        }
+
+        // Fetch Todos from Database
+        async function fetchTodos() {
+            if (!currentUser) return;
+            
+            try {
+                const { data, error } = await supabase
+                    .from('inextodo_todos')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .order('created_at', { ascending: false });
+                
+                if (error) {
+                    throw error;
+                }
+                
+                todos = data || [];
+                renderTodos();
+                updateCounts();
+            } catch (error) {
+                console.error('Error fetching todos:', error);
+                // Show a user-friendly error message
+                todoList.innerHTML = `
+                    <div class="text-center py-4 text-red-500">
+                        <p>Failed to load tasks. Please refresh the page.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Add Todo
+        todoForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!currentUser) return;
+            
+            const titleInput = document.getElementById('todo-title');
+            const descriptionInput = document.getElementById('todo-description');
+            
+            const title = titleInput.value.trim();
+            const description = descriptionInput.value.trim();
+            
+            if (!title) return;
+            
+            try {
+                const newTodo = {
+                    title,
+                    description,
+                    is_completed: false,
+                    user_id: currentUser.id
+                };
+                
+                const { data, error } = await supabase
+                    .from('inextodo_todos')
+                    .insert([newTodo])
+                    .select();
+                
+                if (error) {
+                    throw error;
+                }
+                
+                if (data && data.length > 0) {
+                    todos.unshift(data[0]);
+                    renderTodos();
+                    updateCounts();
+                    
+                    // Reset form
+                    titleInput.value = '';
+                    descriptionInput.value = '';
+                }
+            } catch (error) {
+                console.error('Error adding todo:', error);
+                alert('Failed to add task. Please try again.');
+            }
+        });
+
+        // Toggle Todo Completion
+        async function toggleTodo(id) {
+            if (!currentUser) return;
+            
+            try {
+                const todo = todos.find(t => t.id === id);
+                if (!todo) return;
+                
+                // Note: Using is_completed instead of completed to match the database schema
+                const updatedTodo = { ...todo, is_completed: !todo.is_completed };
+                
+                const { error } = await supabase
+                    .from('inextodo_todos')
+                    .update({ is_completed: updatedTodo.is_completed })
+                    .eq('id', id);
+                
+                if (error) {
+                    throw error;
+                }
+                
+                todos = todos.map(t => t.id === id ? updatedTodo : t);
+                renderTodos();
+                updateCounts();
+            } catch (error) {
+                console.error('Error toggling todo:', error);
+                alert('Failed to update task status. Please try again.');
+            }
+        }
+
+        // Delete Todo
+        async function deleteTodo(id) {
+            if (!currentUser) return;
+            
+            try {
+                const { error } = await supabase
+                    .from('inextodo_todos')
+                    .delete()
+                    .eq('id', id);
+                
+                if (error) {
+                    throw error;
+                }
+                
+                todos = todos.filter(t => t.id !== id);
+                renderTodos();
+                updateCounts();
+            } catch (error) {
+                console.error('Error deleting todo:', error);
+                alert('Failed to delete task. Please try again.');
+            }
+        }
+
+        // Render Todos
+        function renderTodos() {
+            // Apply filter
+            const filter = todoFilter.value;
+            let filteredTodos = todos;
+            
+            if (filter === 'active') {
+                filteredTodos = todos.filter(todo => !todo.is_completed);
+            } else if (filter === 'completed') {
+                filteredTodos = todos.filter(todo => todo.is_completed);
+            }
+            
+            // Show/hide empty state
+            if (filteredTodos.length === 0) {
+                todoEmpty.classList.remove('hidden');
+            } else {
+                todoEmpty.classList.add('hidden');
+            }
+            
+            // Render todo items
+            todoList.innerHTML = '';
+            
+            filteredTodos.forEach(todo => {
+                const todoEl = document.createElement('div');
+                todoEl.className = `todo-item p-4 flex items-start justify-between ${todo.is_completed ? 'completed' : ''}`;
+                todoEl.dataset.id = todo.id;
+                
+                const contentEl = document.createElement('div');
+                contentEl.className = 'flex items-start flex-grow';
+                
+                const checkbox = document.createElement('div');
+                checkbox.className = 'mr-3 mt-1 cursor-pointer';
+                checkbox.innerHTML = todo.is_completed
+                    ? '<i class="fas fa-check-circle text-green-500"></i>'
+                    : '<i class="far fa-circle text-blue-500"></i>';
+                checkbox.addEventListener('click', () => toggleTodo(todo.id));
+                
+                const textEl = document.createElement('div');
+                const titleEl = document.createElement('h3');
+                titleEl.className = 'font-medium';
+                titleEl.textContent = todo.title;
+                
+                textEl.appendChild(titleEl);
+                
+                if (todo.description) {
+                    const descEl = document.createElement('p');
+                    descEl.className = 'text-sm text-gray-400 mt-1';
+                    descEl.textContent = todo.description;
+                    textEl.appendChild(descEl);
+                }
+                
+                contentEl.appendChild(checkbox);
+                contentEl.appendChild(textEl);
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'text-gray-500 hover:text-red-500 transition-colors';
+                deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+                deleteBtn.addEventListener('click', () => deleteTodo(todo.id));
+                
+                todoEl.appendChild(contentEl);
+                todoEl.appendChild(deleteBtn);
+                
+                todoList.appendChild(todoEl);
+            });
+        }
+
+        // Update todo counts
+        function updateCounts() {
+            taskCount.textContent = todos.length;
+            completedCount.textContent = todos.filter(todo => todo.is_completed).length;
+        }
+
+        // Filter change event
+        todoFilter.addEventListener('change', renderTodos);
+
+        // Initialize app when DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check user authentication state
+            checkUser();
+        });
+    </script>
+</body>
+</html>
